@@ -1,0 +1,28 @@
+syntax = "proto3";
+
+option go_package = "disFLD";
+
+//import "google/protobuf/empty.proto";
+
+message HeartBeat {
+    string From = 1;
+    string To = 2;
+    bool Request = 3;
+}
+
+message Node{
+    string NodeID = 1;
+    string IP = 2;
+    string port = 3;
+}
+
+message NodeList {
+    repeated Node NodeID = 1;
+
+}
+
+service DistributedNetwork {
+    rpc HBExchange (HeartBeat) returns (HeartBeat);
+    rpc NodeListExchange (Node) returns (NodeList);
+}
+
