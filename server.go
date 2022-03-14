@@ -28,6 +28,7 @@ type NodeList struct {
 
 type myNetwork struct {
 	myNodeID   string
+	myIP       string
 	nodeList   map[int]NodeList
 	leader     string
 	alive      bool
@@ -35,7 +36,7 @@ type myNetwork struct {
 	evtFailure fd.EvtFailureDetector
 }
 
-func NewmyNetwork(selfNode string, hbOut chan<- fd.Heartbeat) *myNetwork {
+func NewmyNetwork(selfNode string, selfIp string, hbOut chan<- fd.Heartbeat) *myNetwork {
 	nID := []int{}
 	delta := time.Second
 	nodeIndex, _ := strconv.Atoi(selfNode)
@@ -43,7 +44,7 @@ func NewmyNetwork(selfNode string, hbOut chan<- fd.Heartbeat) *myNetwork {
 	eLeader := ld.NewMonLeaderDetector(nID)
 	eFailure := fd.NewEvtFailureDetector(nodeIndex, nID, eLeader, delta, hbOut)
 	nodes := make(map[int]NodeList)
-	nodeSample := NodeList{port: selfNode, IP: "127.0.0.1", conn: nil, NotDead: true}
+	nodeSample := NodeList{port: selfNode, IP: selfIp, conn: nil, NotDead: true}
 	nodes[nodeIndex] = nodeSample
 	return &myNetwork{myNodeID: selfNode, nodeList: nodes, leader: "", alive: true,
 		evtLeader: *eLeader, evtFailure: *eFailure}
@@ -54,10 +55,11 @@ func main() {
 	port := bufio.NewScanner(os.Stdin)
 	port.Scan()
 	hostname, _ := os.Hostname()
-	myNet := NewmyNetwork(port.Text(), hbOut)
+	myNet := NewmyNetwork(port.Text(), hostname, hbOut)
 	id, _ := strconv.Atoi(port.Text())
 	myNet.evtFailure.SetID(id)
 	endpoint := hostname + ":" + port.Text()
+	println(endpoint)
 	go myNet.listenTCP(endpoint)
 	myNet.evtFailure.Start()
 	go func(m *myNetwork) {
@@ -96,6 +98,10 @@ func (m *myNetwork) listenTCP(endpoint string) {
 	} else {
 		fmt.Println("started listening on ", conString)
 	}
+	ipport := strings.Split(conString.String(), ":")
+	ip := ipport[0]
+	//port,_ := strconv.Atoi(ipport[1])
+	m.myIP = ip
 	grpcServer := grpc.NewServer()
 	disFLD.RegisterDistributedNetworkServer(grpcServer, m)
 	err = grpcServer.Serve(lis)
@@ -188,7 +194,7 @@ func (m *myNetwork) NewClient(endpoint string) {
 	port := ipport[1]
 	nodeIndex, _ = strconv.Atoi(port)
 	sample := &NodeList{port: port, IP: ip, conn: conn, NotDead: true}
-	fmt.Println(sample)
+	//fmt.Println(sample)
 	m.nodeList[nodeIndex] = *sample
 	//println("before adding node --> ", nodeIndex)
 	// for index, alive := range m.evtFailure.ShowAlive() {
@@ -218,7 +224,6 @@ func (m *myNetwork) NodeListExchange(ctx context.Context, Node *disFLD.Node) (*d
 		}
 	}
 	nodeList := new(disFLD.NodeList)
-	fmt.Println(m.myNodeID)
 	for _, i := range m.nodeList {
 		nodeList.NodeID = append(nodeList.NodeID, &disFLD.Node{NodeID: i.port, Port: i.port, IP: i.IP})
 	}
