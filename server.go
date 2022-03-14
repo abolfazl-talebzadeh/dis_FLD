@@ -54,11 +54,11 @@ func main() {
 	hbOut := make(chan fd.Heartbeat, 1000)
 	port := bufio.NewScanner(os.Stdin)
 	port.Scan()
-	hostname, _ := os.Hostname()
-	myNet := NewmyNetwork(port.Text(), hostname, hbOut)
+	//, _ := os.Hostname()
+	myNet := NewmyNetwork(port.Text(), what_is_my_ip(), hbOut)
 	id, _ := strconv.Atoi(port.Text())
 	myNet.evtFailure.SetID(id)
-	endpoint := hostname + ":" + port.Text()
+	endpoint := what_is_my_ip() + ":" + port.Text()
 	println(endpoint)
 	go myNet.listenTCP(endpoint)
 	myNet.evtFailure.Start()
@@ -256,4 +256,17 @@ func fd2dsiFLD(hb fd.Heartbeat) disFLD.HeartBeat {
 		XXX_unrecognized:     []byte{},
 		XXX_sizecache:        0,
 	}
+}
+
+func what_is_my_ip() string {
+	conn, error := net.Dial("udp", "8.8.8.8:80")
+	if error != nil {
+		fmt.Println(error)
+
+	}
+
+	defer conn.Close()
+	ipAddress := conn.LocalAddr().(*net.UDPAddr)
+	ipport := strings.Split(ipAddress.String(), ":")
+	return ipport[0]
 }
