@@ -9,6 +9,7 @@ import (
 	"net"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	fd "github.com/abolfazl-talebzadeh/goMods/fd"
@@ -89,10 +90,11 @@ func main() {
 
 func (m *myNetwork) listenTCP(endpoint string) {
 	lis, err := net.Listen("tcp", endpoint)
+	conString := lis.Addr()
 	if err != nil {
 		log.Fatal("Listenning on ", endpoint, " wasn't successful!")
 	} else {
-		fmt.Println("started listening on ", endpoint)
+		fmt.Println("started listening on ", conString)
 	}
 	grpcServer := grpc.NewServer()
 	disFLD.RegisterDistributedNetworkServer(grpcServer, m)
@@ -122,8 +124,11 @@ func theMenue(m *myNetwork) {
 		fmt.Print("Enter the port you want to connect to: ")
 		input.Scan()
 		m.NewClient(input.Text())
-		selfNode := &disFLD.Node{NodeID: m.myNodeID, Port: m.myNodeID, IP: "127.0.0.1"}
-		outerPort, _ := strconv.Atoi(input.Text())
+		ipport := strings.Split(input.Text(), ":")
+		port := ipport[1]
+		ip := ipport[0]
+		selfNode := &disFLD.Node{NodeID: m.myNodeID, Port: m.myNodeID, IP: ip}
+		outerPort, _ := strconv.Atoi(port)
 		conn := m.nodeList[outerPort].conn
 		c := disFLD.NewDistributedNetworkClient(conn)
 		nodes, _ := c.NodeListExchange(context.Background(), selfNode)
@@ -134,7 +139,7 @@ func theMenue(m *myNetwork) {
 				if nodes.port == i.Port {
 					break
 				} else {
-					m.NewClient(i.Port)
+					m.NewClient(i.IP + ":" + i.Port)
 				}
 			}
 			fmt.Println("NodeID: ", i.NodeID)
@@ -170,16 +175,20 @@ func theMenue(m *myNetwork) {
 	}
 }
 
-func (m *myNetwork) NewClient(port string) {
+func (m *myNetwork) NewClient(endpoint string) {
 	var conn *grpc.ClientConn
 	var nodeIndex int
 	//selfNode, _ := strconv.Atoi(m.myNodeID)
-	conn, err := grpc.Dial(":"+port, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conn, err := grpc.Dial(endpoint, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		log.Fatal("couldn't connect to server: ", err)
 	}
+	ipport := strings.Split(endpoint, ":")
+	ip := ipport[0]
+	port := ipport[1]
 	nodeIndex, _ = strconv.Atoi(port)
-	sample := &NodeList{port: port, IP: "127.0.0.1", conn: conn, NotDead: true}
+	sample := &NodeList{port: port, IP: ip, conn: conn, NotDead: true}
+	fmt.Println(sample)
 	m.nodeList[nodeIndex] = *sample
 	//println("before adding node --> ", nodeIndex)
 	// for index, alive := range m.evtFailure.ShowAlive() {
@@ -205,7 +214,7 @@ func (m *myNetwork) NodeListExchange(ctx context.Context, Node *disFLD.Node) (*d
 		if nodes.port == Node.Port {
 			break
 		} else {
-			m.NewClient(Node.Port)
+			m.NewClient(Node.IP + ":" + Node.Port)
 		}
 	}
 	nodeList := new(disFLD.NodeList)
